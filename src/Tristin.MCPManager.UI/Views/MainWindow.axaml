@@ -31,11 +31,13 @@
 
                 <StackPanel Grid.Column="2" Orientation="Vertical" HorizontalAlignment="Right">
                     <TextBlock Foreground="#a0a0b0" FontSize="10">MCP Endpoint (Codex connect URL)</TextBlock>
-                    <Grid ColumnDefinitions="*,Auto">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                         <TextBox Grid.Column="0" Text="{Binding McpEndpoint}" Width="260"
                                  IsReadOnly="True"
                                  FontFamily="Consolas" FontSize="12" Padding="6,4"
                                  Background="#1e1e2a" Foreground="#5eead4" BorderThickness="0"/>
+                        <Button Grid.Column="1" Content="Copy" Click="CopyEndpoint_Click"
+                                ToolTip.Tip="Copy the MCP endpoint to the clipboard"/>
                     </Grid>
                 </StackPanel>
             </Grid>
@@ -52,7 +54,7 @@
                         <TextBlock Text="Unity Editors" Foreground="White" FontWeight="Bold" FontSize="14"
                                    VerticalAlignment="Center"/>
                         <Button Grid.Column="1" Content="↻" Command="{Binding ScanEditorsCommand}"
-                                IsEnabled="{Binding !IsScanning}"
+                                ToolTip.Tip="Scan running Unity Editors"
                                 Padding="10,2" CornerRadius="6" FontSize="14"
                                 Background="#2e7dd6" Foreground="White" BorderThickness="0"/>
                     </Grid>
@@ -93,7 +95,6 @@
 
                     <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8">
                         <Button Content="Connect" Command="{Binding ConnectCommand}"
-                                IsEnabled="{Binding !IsConnecting}"
                                 Classes="Accent"
                                 HorizontalAlignment="Stretch" Grid.Column="0" Grid.ColumnSpan="1">
                             <Button.Styles>
@@ -108,7 +109,6 @@
                             </Button.Styles>
                         </Button>
                         <Button Content="Disconnect" Command="{Binding DisconnectCommand}"
-                                IsEnabled="{Binding !IsDisconnecting}"
                                 HorizontalAlignment="Stretch">
                             <Button.Styles>
                                 <Style Selector="Button">
@@ -145,6 +145,8 @@
                             </TextBlock>
                             <TextBlock Text="{Binding SelectedEditor.ProjectPath}" Foreground="#777" FontSize="10"
                                        TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding SelectedEditor.ErrorMessage}" Foreground="#fca5a5"
+                                       FontSize="11" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
                 </Border>

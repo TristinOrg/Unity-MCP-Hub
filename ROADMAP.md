@@ -15,7 +15,12 @@
 
 ## Next
 
+- Resolve duplicate project-folder names by matching Coplay instances with a stable project identifier when available.
+- Track in-flight proxy requests during shutdown and add protocol tests for SSE, session headers, and cancellation.
+- Verify the pinned Coplay package archive against a published checksum before caching it.
+- Add a connection diagnostics view and copyable MCP client configuration snippets.
 - Make public and upstream ports configurable from the UI and command line.
-- Match Coplay sessions by canonical project path when the upstream API exposes it, avoiding ambiguity between projects with the same folder name.
 - Add automated proxy protocol tests and a Unity package compilation fixture.
 - Add an installer and optional one-click MCP client configuration.
+
+For a prioritized technical review, see [Docs/PROJECT_REVIEW.zh-CN.md](Docs/PROJECT_REVIEW.zh-CN.md).

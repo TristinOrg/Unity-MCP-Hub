@@ -88,6 +88,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
+            ConnectionStatus = $"Startup failed: {ex.Message}";
             AppendLog($"[Error] Startup failed: {ex.Message}");
         }
 

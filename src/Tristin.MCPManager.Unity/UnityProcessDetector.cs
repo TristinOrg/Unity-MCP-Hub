@@ -123,8 +123,11 @@ public sealed class UnityProcessDetector
             return null;
 
         // 4. Extract -projectPath from command line
-        var projectPath = ExtractProjectPath(commandLine);
+        var projectPath = ExtractProjectPathArgument(commandLine);
         if (string.IsNullOrEmpty(projectPath))
+            return null;
+
+        if (!Directory.Exists(projectPath))
             return null;
 
         // Normalize path separators
@@ -175,23 +178,18 @@ public sealed class UnityProcessDetector
     /// Extract -projectPath value from a Unity command line.
     /// Handles: -projectPath "path", -projectpath path, -projectPath path
     /// </summary>
-    private static string? ExtractProjectPath(string commandLine)
+    private static string? ExtractProjectPathArgument(string commandLine)
     {
-        // Match -projectPath followed by an optional quote, then the path
         var match = Regex.Match(
             commandLine,
-            @"-projectPath\s+[""']?(?<path>[^""'\s]+)[""']?",
+            "(?:^|\\s)-projectPath\\s+(?:\\\"(?<quoted>[^\\\"]+)\\\"|'(?<quoted>[^']+)'|(?<plain>\\S+))",
             RegexOptions.IgnoreCase);
 
         if (!match.Success)
             return null;
 
-        var path = match.Groups["path"].Value.Trim().Trim('"', '\'');
-
-        // Validate path exists
-        if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
-            return null;
-
-        return path;
+        return match.Groups["quoted"].Success
+            ? match.Groups["quoted"].Value
+            : match.Groups["plain"].Value;
     }
 }

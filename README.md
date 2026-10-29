@@ -1,95 +1,76 @@
 # Unity MCP Hub
 
-Unity MCP Hub is a Unity-specific Windows desktop hub that gives MCP clients such as Codex one stable endpoint for controlling multiple Unity Editor instances through the official [Coplay MCP for Unity](https://github.com/CoplayDev/unity-mcp).
+**One local MCP endpoint for multiple Unity Editors.** Connect your open Unity projects to Codex or another MCP client through the official [Coplay MCP for Unity](https://github.com/CoplayDev/unity-mcp).
 
-This project is dedicated to Unity and is not a universal MCP server manager. The Hub does not reimplement Unity commands: it manages one pinned Coplay Unity package in a shared local cache, injects one local UPM reference, starts the matching Coplay MCP server, and forwards `http://127.0.0.1:9000/mcp` to it. Coplay owns tool discovery, execution, and per-client multi-instance routing.
+[English](README.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
-For MCP client configuration, multi-Unity routing, and a manual JSON-RPC/PowerShell example, see the [AI Agent Guide](MCP_AGENT_GUIDE.md).
+![Illustration of one hub connecting three Unity Editor sessions](Docs/images/unity-mcp-hub-hero.png)
 
-## Responsibilities and endpoints
+> The banner is a conceptual illustration, not a screenshot of the application.
 
-Unity MCP Hub manages the local Coplay integration lifecycle; Coplay provides the MCP protocol, Unity tools, and multi-instance routing.
+## Why use it?
 
-The Hub is responsible for:
+- **One address:** point your MCP client to `http://127.0.0.1:9000/mcp`.
+- **Multiple projects:** discover running Unity Editors and connect the projects you need. Coplay selects the active Editor per MCP client session.
+- **Reversible connection:** the Hub injects a local UPM package reference and restores the original `manifest.json` and `packages-lock.json` state on disconnect. A recovery journal handles an unclean shutdown.
+- **Use Coplay's tools:** Unity commands, tool discovery, and routing are supplied by Coplay; this app manages the local connection lifecycle.
+- **Offline distribution:** a Windows x64 package can include the .NET and Python runtimes, the pinned Coplay server, and its Unity package.
 
-- discovering running Unity Editors;
-- preparing one shared, pinned Coplay Unity package;
-- reversibly injecting its local UPM reference into selected projects;
-- restoring `Packages/manifest.json` and `Packages/packages-lock.json` on disconnect;
-- recovering unfinished injections after an unclean shutdown;
-- starting and version-checking the matching Coplay MCP Server;
-- bundling the .NET, Python, Coplay server, and Unity package dependencies in the offline release;
-- displaying connected Unity instance state; and
-- exposing the stable public MCP endpoint at `http://127.0.0.1:9000/mcp`.
+## Get started
 
-Coplay is responsible for:
+### Windows offline package
 
-- maintaining connections to multiple Unity Editors;
-- exposing `mcpforunity://instances` and `set_active_instance`;
-- keeping the active Unity selection isolated per MCP client session; and
-- executing all scene, prefab, GameObject, asset, console, and test tools.
+Download a Windows x64 ZIP from [Releases](https://github.com/TristinOrg/Unity-MCP-Hub/releases) when available, extract it, and run `UnityMCPHub.exe`. The offline package does not require end users to install .NET, Python, `uv`, or Git.
 
-The Hub currently forwards `9000/mcp` transparently to Coplay at `8080/mcp`. A client can technically connect directly to `http://127.0.0.1:8080/mcp` and retain the same Unity tools and multi-instance behavior while the Coplay server is running. External clients should nevertheless use `9000/mcp`: it is the Hub's stable public contract, avoids coupling client configuration to Coplay's internal port, and leaves room for future authentication, diagnostics, policy, and upstream-port changes. Do not configure both endpoints in one client, because that exposes duplicate Unity tool sets.
+### Run from source
 
-Multi-Unity routing is provided by Coplay rather than reimplemented by the Hub. Every independent agent should create its own MCP session, read `mcpforunity://instances`, and call `set_active_instance` before performing mutations when more than one Editor is connected.
-
-## Requirements
-
-- .NET 8 SDK
-- Unity 2021.3 or newer
-- [uv](https://docs.astral.sh/uv/) with `uvx` on `PATH`
-
-## Run
+Requirements: Windows, .NET 8 SDK, Unity 2021.3+, and [uv](https://docs.astral.sh/uv/) with `uvx` on `PATH`.
 
 ```powershell
 dotnet run --project src/Tristin.MCPManager.UI
 ```
 
-Then:
-
 1. Open one or more Unity projects.
-2. Select each project in the Hub and click **Connect**.
-3. Configure Codex with the HTTP MCP URL `http://127.0.0.1:9000/mcp`.
-4. When multiple editors are connected, call Coplay's `set_active_instance` in each MCP client session to select its Unity target.
+2. In the Hub, select a project and click **Connect**. Repeat for other projects.
+3. Copy the MCP endpoint from the app and add it to your client:
 
-Disconnect restores the exact original `Packages/manifest.json` and `Packages/packages-lock.json` state. A recovery journal restores unfinished injections the next time the Hub starts after a crash.
+```toml
+[mcp_servers.unity_hub]
+url = "http://127.0.0.1:9000/mcp"
+enabled = true
+```
 
-## Architecture
+4. When multiple Editors are connected, read `mcpforunity://instances` and call Coplay's `set_active_instance` in **each** MCP client session before changing a project.
+
+See the [AI Agent Guide](MCP_AGENT_GUIDE.md) for JSON configuration, multi-instance routing, and a manual HTTP example.
+
+## How it works
 
 ```text
-Codex and other MCP clients
-          |
- http://127.0.0.1:9000/mcp
-          |
- Unity MCP Hub reverse proxy
-          |
- Official Coplay MCP Server (127.0.0.1:8080)
-          |
-    WebSocket sessions
-       /       \
- Unity A       Unity B
- Coplay pkg    Coplay pkg
+Codex / MCP client → 127.0.0.1:9000/mcp → Unity MCP Hub
+                                            ↓ transparent proxy
+                              Coplay server on 127.0.0.1:8080
+                                            ↓
+                               Unity Editor A · B · C
 ```
 
-Each Unity project loads only `com.coplaydev.unity-mcp` through a local `file:` reference. The cached package contains one Hub integration script that configures the local endpoint and starts Coplay's own bridge; there is no second package and no duplicated tool implementation.
+The Hub is Windows-specific and binds its public endpoint to localhost. It uses a pinned Coplay 10.1.0 package and matching server. Do not configure both the Hub's port 9000 and Coplay's internal port 8080 in the same client; that duplicates the Unity tool list.
 
-## Build
+## Build and package
 
 ```powershell
+dotnet test Tristin.MCPManager.sln
 dotnet build Tristin.MCPManager.sln --configuration Release
-```
-
-## Complete offline package
-
-The Windows x64 offline package includes the .NET runtime, Python runtime, Coplay MCP Server 10.1.0, and the integrated Coplay Unity package. Building the package requires `uvx` only on the build machine:
-
-```powershell
 pwsh ./tools/build-offline.ps1
 pwsh ./tools/test-offline.ps1
 ```
 
-Distribute the generated ZIP and SHA-256 file from `artifacts`. End users extract the ZIP, run `UnityMCPHub.exe`, connect their Unity projects, and configure MCP clients with `http://127.0.0.1:9000/mcp`. They do not need .NET, Python, `uv`, Git, or a GitHub connection.
+The offline build requires the Coplay package to be cached by connecting one Unity project first. The build script creates a ZIP and SHA-256 file in `artifacts/`.
+
+## Project status and contributing
+
+See [ROADMAP.md](ROADMAP.md) for implemented features and planned work. Bug reports, usability feedback, translations, and pull requests are welcome through [Issues](https://github.com/TristinOrg/Unity-MCP-Hub/issues). If this tool helps your Unity workflow, a GitHub star helps others find it.
 
 ## License
 
-MIT. MCP for Unity is maintained by Coplay and licensed separately under its repository license.
+MIT. Coplay MCP for Unity is maintained and licensed separately by Coplay. Unity is a trademark of Unity Technologies; this project is not affiliated with Unity Technologies.

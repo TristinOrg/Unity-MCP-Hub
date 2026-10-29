@@ -86,7 +86,7 @@ public static class UnityManifestManager
         var doc  = JsonNode.Parse(json) ?? new JsonObject();
         var deps = doc["dependencies"] as JsonObject ?? new JsonObject();
 
-        deps[CoplayPackageName] = ToFileDependency(coplayPackagePath);
+        deps[CoplayPackageName] = ToFileDependency(manifestPath, coplayPackagePath);
         doc["dependencies"]    = deps;
 
         var newContent = JsonSerializer.Serialize(doc, JsonOptions);
@@ -146,8 +146,13 @@ public static class UnityManifestManager
     public static bool HasBackup(string projectPath)
         => File.Exists(Path.Combine(GetBackupDir(projectPath), ManifestFileName));
 
-    private static string ToFileDependency(string packagePath)
-        => "file:" + Path.GetFullPath(packagePath).Replace("\\", "/");
+    private static string ToFileDependency(string manifestPath, string packagePath)
+    {
+        // Unity resolves local package references from the manifest's Packages directory.
+        var manifestDirectory = Path.GetDirectoryName(Path.GetFullPath(manifestPath))!;
+        var relativePath = Path.GetRelativePath(manifestDirectory, Path.GetFullPath(packagePath));
+        return "file:" + relativePath.Replace('\\', '/');
+    }
 
     private static async Task CopyAsync(string sourcePath, string destinationPath, CancellationToken ct)
     {

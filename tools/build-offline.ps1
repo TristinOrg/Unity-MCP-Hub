@@ -1,5 +1,5 @@
 param(
-    [string] $Version = "0.1.0",
+    [string] $Version = "0.1.1",
     [string] $RuntimeIdentifier = "win-x64"
 )
 
@@ -101,6 +101,11 @@ Get-ChildItem -LiteralPath $bundledSitePackages -Recurse -Directory -Force |
 
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "LICENSE") -Destination (Join-Path $publishRoot "LICENSE.txt")
 Copy-Item -LiteralPath (Join-Path $repositoryRoot "README.md") -Destination (Join-Path $publishRoot "README.md")
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "README.zh-CN.md") -Destination (Join-Path $publishRoot "README.zh-CN.md")
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "README.ja.md") -Destination (Join-Path $publishRoot "README.ja.md")
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "MCP_AGENT_GUIDE.md") -Destination (Join-Path $publishRoot "MCP_AGENT_GUIDE.md")
+New-Item -ItemType Directory -Path (Join-Path $publishRoot "Docs\images") -Force | Out-Null
+Copy-Item -LiteralPath (Join-Path $repositoryRoot "Docs\images\unity-mcp-hub-hero.png") -Destination (Join-Path $publishRoot "Docs\images\unity-mcp-hub-hero.png")
 
 Compress-Archive -LiteralPath $publishRoot -DestinationPath $archivePath -CompressionLevel Optimal
 $hash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()

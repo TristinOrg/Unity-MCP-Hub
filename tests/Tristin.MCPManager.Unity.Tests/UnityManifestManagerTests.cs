@@ -66,7 +66,10 @@ public sealed class UnityManifestManagerTests : IDisposable
         await UnityManifestManager.InjectDependenciesAsync(projectPath, coplayPath);
 
         var manifest = JsonNode.Parse(await File.ReadAllTextAsync(UnityManifestManager.GetManifestPath(projectPath)))!;
-        Assert.StartsWith("file:", manifest["dependencies"]![UnityManifestManager.CoplayPackageName]!.GetValue<string>());
+        var reference = manifest["dependencies"]![UnityManifestManager.CoplayPackageName]!.GetValue<string>();
+        var expected = Path.GetRelativePath(Path.Combine(projectPath, "Packages"), coplayPath).Replace('\\', '/');
+        Assert.Equal("file:" + expected, reference);
+        Assert.False(Path.IsPathRooted(reference["file:".Length..]));
         Assert.Single(manifest["dependencies"]!.AsObject());
     }
 
