@@ -7,7 +7,7 @@
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Unity MCP Hub"
-        Height="300" SizeToContent="Width" CanResize="False">
+        Height="600" SizeToContent="Width" CanResize="False">
 
     <Grid ColumnDefinitions="Auto,Auto">
         <Border Width="380" Padding="14">
