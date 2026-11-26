@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
@@ -39,10 +41,13 @@ public partial class MainViewModel : ObservableObject
     public string McpEndpoint => new Uri(HubEndpoint, "mcp").AbsoluteUri;
 
     [ObservableProperty]
-    private string _logText = string.Empty;
+    private string _logText = "Select a Unity Editor to see its Coplay activity.";
 
     [ObservableProperty]
-    private int _connectionProgress;
+    private bool _isActivityOpen;
+
+    [ObservableProperty]
+    private string? _startupError;
 
     [ObservableProperty]
     private string _connectionStatus = string.Empty;
@@ -76,6 +81,7 @@ public partial class MainViewModel : ObservableObject
 
     public async Task StartAsync()
     {
+        _ = WatchActivityAsync(_cts.Token);
         try
         {
             foreach (var projectPath in await _connector.RecoverPendingAsync(_cts.Token))
@@ -88,7 +94,7 @@ public partial class MainViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            ConnectionStatus = $"Startup failed: {ex.Message}";
+            StartupError = $"Startup failed: {ex.Message}";
             AppendLog($"[Error] Startup failed: {ex.Message}");
         }
 
@@ -98,6 +104,9 @@ public partial class MainViewModel : ObservableObject
 
     partial void OnSelectedEditorChanged(EditorInstance? value)
     {
+        LogText = value == null
+            ? "Select a Unity Editor to see its Coplay activity."
+            : $"Reading Coplay activity for {value.ProjectName}…";
         ConnectCommand.NotifyCanExecuteChanged();
         DisconnectCommand.NotifyCanExecuteChanged();
     }
@@ -136,12 +145,14 @@ public partial class MainViewModel : ObservableObject
             IsScanning = true;
             var detected = await _detector.DetectAsync(_cts.Token);
             var existing = EditorInstances.ToDictionary(editor => editor.ProcessId);
+            var selectedEditor = SelectedEditor;
 
             EditorInstances = new ObservableCollection<EditorInstance>(
                 detected.Select(editor => existing.GetValueOrDefault(editor.ProcessId) ?? editor));
 
-            if (SelectedEditor == null || !EditorInstances.Contains(SelectedEditor))
-                SelectedEditor = EditorInstances.FirstOrDefault();
+            SelectedEditor = selectedEditor != null && EditorInstances.Contains(selectedEditor)
+                ? selectedEditor
+                : EditorInstances.FirstOrDefault();
 
             await UpdateConnectionStatesAsync();
         }
@@ -163,14 +174,14 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
+            ConnectionStatus   = string.Empty;
             IsConnecting       = true;
             target.State       = EditorState.Connecting;
             target.ErrorMessage = null;
 
             var progress = new Progress<(int percent, string message)>(value =>
             {
-                ConnectionProgress = value.percent;
-                ConnectionStatus   = value.message;
+                ConnectionStatus = value.message;
                 AppendLog($"[Connect] {value.percent}% {value.message}");
             });
 
@@ -181,16 +192,13 @@ public partial class MainViewModel : ObservableObject
             if (!await WaitForCoplayConnectionAsync(target, TimeSpan.FromMinutes(3), _cts.Token))
                 throw new TimeoutException("Coplay bridge did not connect within 3 minutes. Check Unity Console and package resolution.");
 
-            target.State   = EditorState.Connected;
-            ConnectionProgress = 100;
-            ConnectionStatus   = "Connected through Coplay MCP";
+            target.State = EditorState.Connected;
             AppendLog($"[OK] {target.ProjectName} connected. Use set_active_instance from each MCP client session when multiple projects are connected.");
         }
         catch (Exception ex)
         {
             target.State        = EditorState.Error;
             target.ErrorMessage = ex.Message;
-            ConnectionStatus    = ex.Message;
             AppendLog($"[Error] Connect failed: {ex.Message}");
         }
         finally
@@ -206,8 +214,9 @@ public partial class MainViewModel : ObservableObject
 
         try
         {
-            IsDisconnecting = true;
-            target.State    = EditorState.Disconnecting;
+            IsDisconnecting     = true;
+            target.State        = EditorState.Disconnecting;
+            target.ErrorMessage = null;
 
             if (!await _connector.DisconnectAsync(target, _cts.Token))
                 throw new InvalidOperationException(target.ErrorMessage ?? "Manifest restore failed.");
@@ -291,12 +300,35 @@ public partial class MainViewModel : ObservableObject
     private static bool Matches(EditorInstance editor, CoplayUnityInstance instance)
         => string.Equals(editor.ProjectName, instance.Project, StringComparison.OrdinalIgnoreCase);
 
-    private void AppendLog(string line)
+    private static void AppendLog(string line) => Trace.WriteLine(line);
+
+    private async Task WatchActivityAsync(CancellationToken cancellationToken)
     {
-        LogText = $"[{DateTime.Now:HH:mm:ss}] {line}{Environment.NewLine}{LogText}";
-        var lines = LogText.Split(Environment.NewLine);
-        if (lines.Length > 300)
-            LogText = string.Join(Environment.NewLine, lines.Take(300));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                if (!IsActivityOpen || SelectedEditor is not { } editor)
+                    continue;
+
+                string activity;
+                try
+                {
+                    activity = await CoplayActivityLog.ReadRecentAsync(editor.ProjectPath, cancellationToken);
+                    if (string.IsNullOrEmpty(activity))
+                        activity = $"No Coplay activity recorded for {editor.ProjectName}. Enable Log Record in Coplay’s Advanced settings in Unity, then run an MCP tool.";
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    activity = $"Could not read the Coplay activity for {editor.ProjectName}. {ex.Message}";
+                }
+
+                if (ReferenceEquals(editor, SelectedEditor) && !cancellationToken.IsCancellationRequested)
+                    LogText = activity;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
     }
 
     /// <summary>

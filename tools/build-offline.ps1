@@ -1,5 +1,5 @@
 param(
-    [string] $Version = "0.1.1",
+    [string] $Version = "0.1.2",
     [string] $RuntimeIdentifier = "win-x64"
 )
 
@@ -21,8 +21,8 @@ if (!(Test-Path -LiteralPath (Join-Path $coplayPackage "package.json")))
     throw "Coplay Unity package $coplayVersion is not cached. Connect one Unity project through the Hub, then rebuild."
 }
 
-$resolvedArtifacts = [IO.Path]::GetFullPath($artifactsRoot)
-foreach ($path in @($stagingRoot, $archivePath, $checksumPath))
+$resolvedArtifacts = [IO.Path]::GetFullPath($artifactsRoot) + [IO.Path]::DirectorySeparatorChar
+foreach ($path in @($publishRoot, $archivePath, $checksumPath))
 {
     $resolvedPath = [IO.Path]::GetFullPath($path)
     if (!$resolvedPath.StartsWith($resolvedArtifacts, [StringComparison]::OrdinalIgnoreCase))

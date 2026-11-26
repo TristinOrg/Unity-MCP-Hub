@@ -1,5 +1,5 @@
 param(
-    [string] $PackageRoot = "$PSScriptRoot\..\artifacts\.offline-staging\UnityMCPHub-0.1.1-win-x64",
+    [string] $PackageRoot = "$PSScriptRoot\..\artifacts\.offline-staging\UnityMCPHub-0.1.2-win-x64",
     [int] $Port = 18080
 )
 
